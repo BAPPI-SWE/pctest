@@ -27,8 +27,8 @@
 
 <div id="start">
   <h1></h1>
-  <button id="startBtn">Check PC status</button>
-  <p><code id="hint"></code>.</p>
+  <button id="startBtn">Check PC Condition</button>
+  <p> <code id="hint"></code>.</p>
 </div>
 
 <script>
@@ -59,6 +59,24 @@ async function enterFullscreen(){
   // Chrome/Edge: captures Esc and other keys while fullscreen (Esc then needs a long hold)
   try { await navigator.keyboard?.lock?.(); } catch(e){}
 }
+/* Pointer lock: the mouse can no longer reach the top edge, so the browser's exit "X" never appears */
+let vx = innerWidth/2, vy = innerHeight/2;   // virtual cursor position
+function grabPointer(){
+  try {
+    if (!document.pointerLockElement) {
+      const p = document.documentElement.requestPointerLock?.({ unadjustedMovement:true });
+      if (p && p.catch) p.catch(() => { try { document.documentElement.requestPointerLock(); } catch(e){} });
+    }
+  } catch(e){}
+}
+addEventListener("mousemove", e => {
+  if (!locked) return;
+  if (document.pointerLockElement) {
+    vx = Math.min(W, Math.max(0, vx + e.movementX));
+    vy = Math.min(H, Math.max(0, vy + e.movementY));
+  } else { vx = e.clientX; vy = e.clientY; }
+  if (Math.random() < 0.25) sparkles.push(newSpark(vx, vy));
+}, true);
 async function requestWake(){
   try { wakeLock = await navigator.wakeLock?.request("screen"); } catch(e){}
 }
@@ -66,25 +84,39 @@ async function lockUp(){
   locked = true;
   startEl.classList.add("hidden");
   document.body.classList.add("locked");
+  grabPointer();
   await enterFullscreen();
+  grabPointer();
   requestWake();
 }
 async function unlock(){
   locked = false;
   document.body.classList.remove("locked");
   try { navigator.keyboard?.unlock?.(); } catch(e){}
+  try { document.exitPointerLock?.(); } catch(e){}
   try { await wakeLock?.release(); } catch(e){}
   try { if (document.fullscreenElement) await document.exitFullscreen(); } catch(e){}
   startEl.classList.remove("hidden");
 }
 document.getElementById("startBtn").addEventListener("click", lockUp);
 
+/* On first load only: any click, tap or key press anywhere starts it */
+let firstLoad = true;
+function autoStart(e){
+  if (!firstLoad || locked) return;
+  firstLoad = false;
+  e.preventDefault();
+  lockUp();
+}
+addEventListener("pointerdown", autoStart, true);
+addEventListener("keydown", autoStart, true);
+
 function isSecret(e){
   return e.code === SECRET.code && e.shiftKey === SECRET.shift && e.ctrlKey === SECRET.ctrl && e.altKey === SECRET.alt;
 }
 
 /* If baby somehow leaves fullscreen, the next touch/key brings it right back */
-function reenter(){ if (locked && !document.fullscreenElement) enterFullscreen(); }
+function reenter(){ if (!locked) return; if (!document.fullscreenElement) enterFullscreen(); grabPointer(); }
 document.addEventListener("visibilitychange", () => { if (locked && document.visibilityState==="visible") requestWake(); });
 
 /* ---------- Input blocking ---------- */
@@ -104,11 +136,7 @@ addEventListener("keypress", e => { if (locked) block(e); }, true);
 
 addEventListener("pointerdown", e => {
   if (!locked) return;
-  block(e); reenter(); burst(e.clientX, e.clientY);
-}, true);
-addEventListener("pointermove", e => {
-  if (!locked) return;
-  if (Math.random() < 0.25) sparkles.push(newSpark(e.clientX, e.clientY));
+  block(e); reenter(); burst(document.pointerLockElement ? vx : e.clientX, document.pointerLockElement ? vy : e.clientY);
 }, true);
 
 addEventListener("beforeunload", e => { if (locked) { e.preventDefault(); e.returnValue = ""; } });
