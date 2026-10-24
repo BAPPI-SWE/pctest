@@ -347,9 +347,7 @@ const SOUND_ON_TOUCH = false;   // true = soft "pop" sound when baby presses som
    It talks to Page 2 only through two functions: sceneBurst(x,y) and sceneTrail(x,y).
    ============================================================== */
 if ("ontouchstart" in window || navigator.maxTouchPoints > 0) document.getElementById("touchHint").style.display = "block";
-document.getElementById("hint").textContent =
-  [SECRET.ctrl && "Ctrl", SECRET.alt && "Alt", SECRET.shift && "Shift", SECRET.code.replace("Key","")]
-  .filter(Boolean).join(" + ");
+
 
 const startEl = document.getElementById("start");
 let locked = false, wakeLock = null;
